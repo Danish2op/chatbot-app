@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { useSignOut, useUserId } from '@nhost/react';
@@ -26,6 +26,7 @@ const ChatPage: React.FC = () => {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(chatId || null);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
 
   // Queries with polling for real-time updates
   const { data: chatsData, loading: chatsLoading, refetch: refetchChats } = useQuery(GET_CHATS, {
@@ -36,12 +37,35 @@ const ChatPage: React.FC = () => {
     data: messagesData, 
     loading: messagesLoading,
     refetch: refetchMessages,
+    startPolling,
+    stopPolling,
   } = useQuery(GET_CHAT_MESSAGES, {
     variables: { chatId: selectedChatId },
     skip: !selectedChatId,
-    fetchPolicy: 'network-only', // Always fetch fresh data
-    pollInterval: 1000, // Poll every 1 second for messages
+    fetchPolicy: 'cache-and-network', // Changed from network-only
+    notifyOnNetworkStatusChange: true,
   });
+
+  // Start aggressive polling when waiting for response
+  useEffect(() => {
+    if (isWaitingForResponse && selectedChatId) {
+      startPolling(500); // Poll every 500ms when waiting for response
+      
+      // Stop aggressive polling after 15 seconds
+      const timeout = setTimeout(() => {
+        setIsWaitingForResponse(false);
+        startPolling(2000); // Go back to normal polling
+      }, 15000);
+      
+      return () => {
+        clearTimeout(timeout);
+      };
+    } else if (selectedChatId) {
+      startPolling(2000); // Normal polling every 2 seconds
+    } else {
+      stopPolling();
+    }
+  }, [isWaitingForResponse, selectedChatId, startPolling, stopPolling]);
 
   const [createChat] = useMutation(CREATE_CHAT, {
     onCompleted: () => {
@@ -51,23 +75,42 @@ const ChatPage: React.FC = () => {
 
   const [insertMessage] = useMutation(INSERT_MESSAGE, {
     onCompleted: () => {
-      // Immediately refetch messages after inserting
       refetchMessages();
-    }
+    },
+    refetchQueries: [
+      {
+        query: GET_CHAT_MESSAGES,
+        variables: { chatId: selectedChatId },
+      },
+    ],
   });
 
   const [sendMessageToChatbot] = useMutation(SEND_MESSAGE_TO_CHATBOT, {
-    onCompleted: () => {
-      // Start checking for response
-      setTimeout(() => refetchMessages(), 500);
-      setTimeout(() => refetchMessages(), 1500);
-      setTimeout(() => refetchMessages(), 3000);
+    onCompleted: (data) => {
+      console.log('Chatbot response received:', data);
+      setIsWaitingForResponse(true);
+      
+      // Force refetch multiple times
+      const refetchInterval = setInterval(() => {
+        refetchMessages();
+      }, 1000);
+      
+      // Clear interval after 10 seconds
+      setTimeout(() => {
+        clearInterval(refetchInterval);
+        setIsWaitingForResponse(false);
+      }, 10000);
+    },
+    onError: (error) => {
+      console.error('Chatbot error:', error);
+      setIsWaitingForResponse(false);
     }
   });
 
   // Subscriptions as backup for real-time updates
   useSubscription(SUBSCRIBE_TO_CHATS, {
-    onSubscriptionData: () => {
+    onSubscriptionData: ({ subscriptionData }) => {
+      console.log('Chat subscription update:', subscriptionData);
       refetchChats();
     },
   });
@@ -75,7 +118,8 @@ const ChatPage: React.FC = () => {
   useSubscription(SUBSCRIBE_TO_MESSAGES, {
     variables: { chatId: selectedChatId },
     skip: !selectedChatId,
-    onSubscriptionData: () => {
+    onSubscriptionData: ({ subscriptionData }) => {
+      console.log('Message subscription update:', subscriptionData);
       refetchMessages();
     },
   });
@@ -87,14 +131,14 @@ const ChatPage: React.FC = () => {
     if (chatId && chatId !== selectedChatId) {
       setSelectedChatId(chatId);
     }
-  }, [chatId]);
+  }, [chatId, selectedChatId]);
 
   // Refetch messages when chat changes
   useEffect(() => {
     if (selectedChatId) {
       refetchMessages();
     }
-  }, [selectedChatId]);
+  }, [selectedChatId, refetchMessages]);
 
   const handleCreateNewChat = async () => {
     if (isCreatingChat) return;
@@ -109,7 +153,6 @@ const ChatPage: React.FC = () => {
         const newChatId = data.insert_chats_one.id;
         setSelectedChatId(newChatId);
         navigate(`/chat/${newChatId}`);
-        // Refetch chats to show the new one
         refetchChats();
       }
     } catch (error) {
@@ -128,10 +171,11 @@ const ChatPage: React.FC = () => {
     if (!selectedChatId || isSending) return;
 
     setIsSending(true);
+    setIsWaitingForResponse(true);
     
     try {
       // First, insert the user message
-      await insertMessage({
+      const { data: messageData } = await insertMessage({
         variables: {
           chat_id: selectedChatId,
           content,
@@ -139,31 +183,28 @@ const ChatPage: React.FC = () => {
         },
       });
 
+      console.log('User message inserted:', messageData);
+
       // Force immediate refetch to show user message
       await refetchMessages();
 
       // Then send to chatbot
-      await sendMessageToChatbot({
+      console.log('Sending to chatbot...');
+      const { data: chatbotData } = await sendMessageToChatbot({
         variables: {
           chat_id: selectedChatId,
           message: content,
         },
       });
 
-      // Keep refetching for a few seconds to catch the AI response
-      const interval = setInterval(() => {
-        refetchMessages();
-      }, 1000);
-
-      // Stop refetching after 10 seconds
-      setTimeout(() => {
-        clearInterval(interval);
-      }, 10000);
+      console.log('Chatbot mutation response:', chatbotData);
 
     } catch (error) {
       console.error('Error sending message:', error);
+      setIsWaitingForResponse(false);
     } finally {
       setIsSending(false);
+      // Keep isWaitingForResponse true - it will be set to false by the effect
     }
   };
 
@@ -211,7 +252,7 @@ const ChatPage: React.FC = () => {
                 messages={messages}
                 loading={messagesLoading && messages.length === 0}
               />
-              {isSending && (
+              {(isSending || isWaitingForResponse) && (
                 <div style={{
                   textAlign: 'center',
                   padding: '10px',
@@ -219,7 +260,7 @@ const ChatPage: React.FC = () => {
                   fontSize: '14px',
                   fontStyle: 'italic'
                 }}>
-                  AI is typing...
+                  {isSending ? 'Sending...' : 'AI is typing...'}
                 </div>
               )}
             </div>
