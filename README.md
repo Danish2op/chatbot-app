@@ -1,46 +1,108 @@
-# Getting Started with Create React App
+# 🤖 Chatbot App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This is a full-stack chatbot application built with React, Nhost, and a custom N8N workflow for the chatbot logic. The application provides a seamless and real-time chatting experience with user authentication and a persistent chat history.
 
-## Available Scripts
+## 🌐 Live Demo
 
-In the project directory, you can run:
+You can try out the live application here: [https://68a45d3b1010970008e09df0--chat8n.netlify.app/](https://68a45d3b1010970008e09df0--chat8n.netlify.app/)
 
-### `npm start`
+<!--[Chatbot App Screenshot](https://i.imgur.com/YOUR_SCREENSHOT.png)   Replace with a real screenshot -->
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## ✨ Features
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+*   **User Authentication:** Secure sign-up and sign-in with email and password.
+*   **Real-time Chat:** Instant messaging with a chatbot, with messages appearing in real-time.
+*   **Chat History:** All conversations are saved and can be revisited.
+*   **Create Multiple Chats:** Users can create multiple chat sessions.
+*   **Responsive Design:** The application is designed to work on various screen sizes.
+*   **N8N Workflow Integration:** The chatbot's logic is powered by a flexible and powerful N8N workflow.
 
-### `npm test`
+## 🛠️ Tech Stack
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+*   **Frontend:**
+    *   [React](https://reactjs.org/)
+    *   [TypeScript](https://www.typescriptlang.org/)
+    *   [React Router](https://reactrouter.com/)
+    *   [Apollo Client](https://www.apollographql.com/docs/react/) for GraphQL
+    *   [Nhost React SDK](https://nhost.io/docs/sdk/react)
+*   **Backend:**
+    *   [Nhost](https://nhost.io/): Managed backend platform providing:
+        *   **Authentication:** User management and authentication.
+        *   **GraphQL API:** Instant GraphQL API powered by Hasura.
+        *   **PostgreSQL Database:** For storing chat and user data.
+*   **Chatbot Logic:**
+    *   [N8N](https://n8n.io/): A powerful workflow automation tool used to create the chatbot's logic.
 
-### `npm run build`
+## 🚀 Getting Started
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Prerequisites
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+*   [Node.js](https://nodejs.org/en/) (v16 or later)
+*   [npm](https://www.npmjs.com/)
+*   An active [Nhost](https://nhost.io/) account
+*   An active [N8N](https://n8n.io/) account (or self-hosted instance)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Installation
 
-### `npm run eject`
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/chatbot-app.git
+    cd chatbot-app
+    ```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+2.  **Install frontend dependencies:**
+    ```bash
+    cd frontend
+    npm install
+    ```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+3.  **Set up Nhost:**
+    *   Create a new project on Nhost.
+    *   In the Nhost dashboard, go to **Settings > General** and copy the **Subdomain** and **Region**.
+    *   Create a `.env` file in the `frontend` directory and add the following:
+        ```
+        REACT_APP_NHOST_SUBDOMAIN=your-nhost-subdomain
+        REACT_APP_NHOST_REGION=your-nhost-region
+        ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+4.  **Set up the database:**
+    *   In your Nhost project, go to the **Database** section.
+    *   Create the following tables:
+        *   `chats` (id, title, user_id, created_at, updated_at)
+        *   `messages` (id, chat_id, content, role, created_at, user_id)
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+5.  **Set up the N8N workflow:**
+    *   Import the provided N8N workflow into your N8N instance.
+    *   Configure the workflow with your chatbot's logic and any necessary API keys.
+    *   Expose the workflow as a webhook.
 
-## Learn More
+6.  **Create a Hasura Action:**
+    *   In your Nhost project, go to the **Hasura** section.
+    *   Go to the **Actions** tab and create a new action called `sendMessage`.
+    *   Set the webhook URL to your N8N webhook URL.
+    *   Define the action's request and response types.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Running the Application
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+cd frontend
+npm start
+```
+
+The application will be available at `http://localhost:3000`.
+
+## 🤖 N8N Workflow
+
+The chatbot's intelligence is powered by an N8N workflow. This workflow receives the user's message, processes it, and returns a response. This allows for easy customization and integration with various AI models and services.
+
+Here is a high-level overview of the N8N workflow structure:
+
+![N8N Workflow](N8N-WORKFLOW.png)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a pull request or open an issue.
+
+## 📝 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
